@@ -15,7 +15,7 @@ import net.sf.jsqlparser.statement.select.SelectVisitor;
 
 public class AlterViewDeParser extends AbstractDeParser<AlterView> {
 
-    private SelectVisitor selectVisitor;
+    private final SelectVisitor<StringBuilder> selectVisitor;
 
     public AlterViewDeParser(StringBuilder buffer) {
         super(buffer);
@@ -25,7 +25,7 @@ public class AlterViewDeParser extends AbstractDeParser<AlterView> {
         selectVisitor = selectDeParser;
     }
 
-    public AlterViewDeParser(StringBuilder buffer, SelectVisitor selectVisitor) {
+    public AlterViewDeParser(StringBuilder buffer, SelectVisitor<StringBuilder> selectVisitor) {
         super(buffer);
         this.selectVisitor = selectVisitor;
     }
@@ -33,17 +33,17 @@ public class AlterViewDeParser extends AbstractDeParser<AlterView> {
     @Override
     public void deParse(AlterView alterView) {
         if (alterView.isUseReplace()) {
-            buffer.append("REPLACE ");
+            builder.append("REPLACE ");
         } else {
-            buffer.append("ALTER ");
+            builder.append("ALTER ");
         }
-        buffer.append("VIEW ").append(alterView.getView().getFullyQualifiedName());
+        builder.append("VIEW ").append(alterView.getView().getFullyQualifiedName());
         if (alterView.getColumnNames() != null) {
-            buffer.append(PlainSelect.getStringList(alterView.getColumnNames(), true, true));
+            builder.append(PlainSelect.getStringList(alterView.getColumnNames(), true, true));
         }
-        buffer.append(" AS ");
+        builder.append(" AS ");
 
-        alterView.getSelectBody().accept(selectVisitor);
+        alterView.getSelect().accept(selectVisitor, null);
     }
 
 }

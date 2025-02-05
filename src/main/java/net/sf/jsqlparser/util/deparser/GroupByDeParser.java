@@ -9,72 +9,42 @@
  */
 package net.sf.jsqlparser.util.deparser;
 
-import java.util.Iterator;
-import java.util.List;
-
-import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.ExpressionVisitor;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.statement.select.GroupByElement;
 
 public class GroupByDeParser extends AbstractDeParser<GroupByElement> {
 
-    private ExpressionVisitor expressionVisitor;
+    private final ExpressionListDeParser<?> expressionListDeParser;
 
-    GroupByDeParser() {
-        super(new StringBuilder());
-    }
-
-    public GroupByDeParser(ExpressionVisitor expressionVisitor, StringBuilder buffer) {
+    public GroupByDeParser(ExpressionVisitor<StringBuilder> expressionVisitor,
+            StringBuilder buffer) {
         super(buffer);
-        this.expressionVisitor = expressionVisitor;
-        this.buffer = buffer;
+        this.expressionListDeParser = new ExpressionListDeParser<>(expressionVisitor, buffer);
+        this.builder = buffer;
     }
 
     @Override
     @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
     public void deParse(GroupByElement groupBy) {
-        buffer.append("GROUP BY ");
-        if (groupBy.isUsingBrackets()) {
-            buffer.append("( ");
-        }
-        List<Expression> expressions = groupBy.getGroupByExpressionList().getExpressions();
-        if (expressions != null) {
-            for (Iterator<Expression> iter = expressions.iterator(); iter.hasNext();) {
-                iter.next().accept(expressionVisitor);
-                if (iter.hasNext()) {
-                    buffer.append(", ");
-                }
-            }
-        }
-        if (groupBy.isUsingBrackets()) {
-            buffer.append(" )");
-        }
+        builder.append("GROUP BY ");
+        expressionListDeParser.deParse(groupBy.getGroupByExpressionList());
+
+        int i = 0;
         if (!groupBy.getGroupingSets().isEmpty()) {
-            if (buffer.charAt(buffer.length() - 1) != ' ') {
-                buffer.append(' ');
+            if (builder.charAt(builder.length() - 1) != ' ') {
+                builder.append(' ');
             }
-            buffer.append("GROUPING SETS (");
-            boolean first = true;
-            for (Object o : groupBy.getGroupingSets()) {
-                if (first) {
-                    first = false;
-                } else {
-                    buffer.append(", ");
-                }
-                if (o instanceof Expression) {
-                    buffer.append(o.toString());
-                } else if (o instanceof ExpressionList) {
-                    ExpressionList list = (ExpressionList) o;
-                    buffer.append(list.getExpressions() == null ? "()" : list.toString());
-                }
+            builder.append("GROUPING SETS (");
+            for (ExpressionList<?> expressionList : groupBy.getGroupingSets()) {
+                builder.append(i++ > 0 ? ", " : "");
+                expressionListDeParser.deParse(expressionList);
             }
-            buffer.append(")");
+            builder.append(")");
+        }
+
+        if (groupBy.isMysqlWithRollup()) {
+            builder.append(" WITH ROLLUP");
         }
     }
-
-    void setExpressionVisitor(ExpressionVisitor expressionVisitor) {
-        this.expressionVisitor = expressionVisitor;
-    }
-
 }

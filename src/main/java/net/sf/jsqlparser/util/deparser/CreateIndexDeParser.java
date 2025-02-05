@@ -24,35 +24,46 @@ public class CreateIndexDeParser extends AbstractDeParser<CreateIndex> {
     public void deParse(CreateIndex createIndex) {
         Index index = createIndex.getIndex();
 
-        buffer.append("CREATE ");
+        builder.append("CREATE ");
 
         if (index.getType() != null) {
-            buffer.append(index.getType());
-            buffer.append(" ");
+            builder.append(index.getType());
+            builder.append(" ");
         }
 
-        buffer.append("INDEX ");
-        buffer.append(index.getName());
-        buffer.append(" ON ");
-        buffer.append(createIndex.getTable().getFullyQualifiedName());
+        builder.append("INDEX ");
+        if (createIndex.isUsingIfNotExists()) {
+            builder.append("IF NOT EXISTS ");
+        }
+        builder.append(index.getName());
 
         String using = index.getUsing();
-        if (using != null) {
-            buffer.append(" USING ");
-            buffer.append(using);
+        if (using != null && createIndex.isIndexTypeBeforeOn()) {
+            builder.append(" USING ");
+            builder.append(using);
+        }
+
+        builder.append(" ON ");
+        builder.append(createIndex.getTable().getFullyQualifiedName());
+
+        if (using != null && !createIndex.isIndexTypeBeforeOn()) {
+            builder.append(" USING ");
+            builder.append(using);
         }
 
         if (index.getColumnsNames() != null) {
-            buffer.append(" (");
-            buffer.append(index.getColumnWithParams().stream()
-                    .map(cp -> cp.columnName + (cp.getParams() != null ? " " + String.join(" ", cp.getParams()) : ""))
+            builder.append(" (");
+            builder.append(index.getColumnWithParams().stream()
+                    .map(cp -> cp.columnName
+                            + (cp.getParams() != null ? " " + String.join(" ", cp.getParams())
+                                    : ""))
                     .collect(joining(", ")));
-            buffer.append(")");
+            builder.append(")");
         }
 
         if (createIndex.getTailParameters() != null) {
             for (String param : createIndex.getTailParameters()) {
-                buffer.append(" ").append(param);
+                builder.append(" ").append(param);
             }
         }
     }

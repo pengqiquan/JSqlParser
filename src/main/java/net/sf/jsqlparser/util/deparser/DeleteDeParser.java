@@ -9,26 +9,28 @@
  */
 package net.sf.jsqlparser.util.deparser;
 
-import java.util.Iterator;
-import static java.util.stream.Collectors.joining;
-
 import net.sf.jsqlparser.expression.ExpressionVisitor;
 import net.sf.jsqlparser.expression.ExpressionVisitorAdapter;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.select.Join;
-import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.WithItem;
+
+import java.util.Iterator;
+
+import static java.util.stream.Collectors.joining;
 
 public class DeleteDeParser extends AbstractDeParser<Delete> {
 
-    private ExpressionVisitor expressionVisitor = new ExpressionVisitorAdapter();
+    private ExpressionVisitor<StringBuilder> expressionVisitor =
+            new ExpressionVisitorAdapter<StringBuilder>();
 
     public DeleteDeParser() {
         super(new StringBuilder());
     }
 
-    public DeleteDeParser(ExpressionVisitor expressionVisitor, StringBuilder buffer) {
+    public DeleteDeParser(ExpressionVisitor<StringBuilder> expressionVisitor,
+            StringBuilder buffer) {
         super(buffer);
         this.expressionVisitor = expressionVisitor;
     }
@@ -36,79 +38,91 @@ public class DeleteDeParser extends AbstractDeParser<Delete> {
     @Override
     @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity"})
     public void deParse(Delete delete) {
-    if (delete.getWithItemsList() != null && !delete.getWithItemsList().isEmpty()) {
-      buffer.append("WITH ");
-      for (Iterator<WithItem> iter = delete.getWithItemsList().iterator(); iter.hasNext(); ) {
-        WithItem withItem = iter.next();
-        buffer.append(withItem);
-        if (iter.hasNext()) {
-          buffer.append(",");
+        if (delete.getWithItemsList() != null && !delete.getWithItemsList().isEmpty()) {
+            builder.append("WITH ");
+            for (Iterator<WithItem<?>> iter = delete.getWithItemsList().iterator(); iter
+                    .hasNext();) {
+                WithItem<?> withItem = iter.next();
+                builder.append(withItem);
+                if (iter.hasNext()) {
+                    builder.append(",");
+                }
+                builder.append(" ");
+            }
         }
-        buffer.append(" ");
-      }
-    }
-        buffer.append("DELETE");
+        builder.append("DELETE");
+        if (delete.getOracleHint() != null) {
+            builder.append(delete.getOracleHint()).append(" ");
+        }
         if (delete.getModifierPriority() != null) {
-            buffer.append(" ").append(delete.getModifierPriority());
+            builder.append(" ").append(delete.getModifierPriority());
         }
         if (delete.isModifierQuick()) {
-            buffer.append(" QUICK");
+            builder.append(" QUICK");
         }
         if (delete.isModifierIgnore()) {
-            buffer.append(" IGNORE");
+            builder.append(" IGNORE");
         }
         if (delete.getTables() != null && !delete.getTables().isEmpty()) {
-            buffer.append(
-                    delete.getTables().stream().map(Table::getFullyQualifiedName).collect(joining(", ", " ", "")));
+            builder.append(
+                    delete.getTables().stream().map(Table::getFullyQualifiedName)
+                            .collect(joining(", ", " ", "")));
         }
 
-        if (delete.getOutputClause()!=null) {
-            delete.getOutputClause().appendTo(buffer);
+        if (delete.getOutputClause() != null) {
+            delete.getOutputClause().appendTo(builder);
         }
 
         if (delete.isHasFrom()) {
-            buffer.append(" FROM");
+            builder.append(" FROM");
         }
-        buffer.append(" ").append(delete.getTable().toString());
+        builder.append(" ").append(delete.getTable().toString());
 
         if (delete.getUsingList() != null && !delete.getUsingList().isEmpty()) {
-            buffer.append(" USING").append(
-                    delete.getUsingList().stream().map(Table::toString).collect(joining(", ", " ", "")));
+            builder.append(" USING").append(
+                    delete.getUsingList().stream().map(Table::toString)
+                            .collect(joining(", ", " ", "")));
         }
         if (delete.getJoins() != null) {
             for (Join join : delete.getJoins()) {
                 if (join.isSimple()) {
-                    buffer.append(", ").append(join);
+                    builder.append(", ").append(join);
                 } else {
-                    buffer.append(" ").append(join);
+                    builder.append(" ").append(join);
                 }
             }
         }
 
-        if (delete.getWhere() != null) {
-            buffer.append(" WHERE ");
-            delete.getWhere().accept(expressionVisitor);
-        }
+        deparseWhereClause(delete);
 
+        if (delete.getPreferringClause() != null) {
+            builder.append(" ").append(delete.getPreferringClause());
+        }
         if (delete.getOrderByElements() != null) {
-            new OrderByDeParser(expressionVisitor, buffer).deParse(delete.getOrderByElements());
+            new OrderByDeParser(expressionVisitor, builder).deParse(delete.getOrderByElements());
         }
         if (delete.getLimit() != null) {
-            new LimitDeparser(buffer).deParse(delete.getLimit());
+            new LimitDeparser(expressionVisitor, builder).deParse(delete.getLimit());
         }
 
-        if (delete.getReturningExpressionList() != null) {
-            buffer.append(" RETURNING ").append(PlainSelect.
-                    getStringList(delete.getReturningExpressionList(), true, false));
+        if (delete.getReturningClause() != null) {
+            delete.getReturningClause().appendTo(builder);
         }
 
     }
 
-    public ExpressionVisitor getExpressionVisitor() {
+    protected void deparseWhereClause(Delete delete) {
+        if (delete.getWhere() != null) {
+            builder.append(" WHERE ");
+            delete.getWhere().accept(expressionVisitor, null);
+        }
+    }
+
+    public ExpressionVisitor<StringBuilder> getExpressionVisitor() {
         return expressionVisitor;
     }
 
-    public void setExpressionVisitor(ExpressionVisitor visitor) {
+    public void setExpressionVisitor(ExpressionVisitor<StringBuilder> visitor) {
         expressionVisitor = visitor;
     }
 }

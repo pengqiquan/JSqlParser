@@ -24,13 +24,15 @@ public class AssortedFeatureTests {
     static class ReplaceColumnAndLongValues extends ExpressionDeParser {
 
         @Override
-        public void visit(StringValue stringValue) {
-            this.getBuffer().append("?");
+        public <K> StringBuilder visit(StringValue stringValue, K parameters) {
+            this.getBuilder().append("?");
+            return null;
         }
 
         @Override
-        public void visit(LongValue longValue) {
-            this.getBuffer().append("?");
+        public <K> StringBuilder visit(LongValue longValue, K parameters) {
+            this.getBuilder().append("?");
+            return null;
         }
     }
 
@@ -40,21 +42,23 @@ public class AssortedFeatureTests {
 
         SelectDeParser selectDeparser = new SelectDeParser(expr, buffer);
         expr.setSelectVisitor(selectDeparser);
-        expr.setBuffer(buffer);
+        expr.setBuilder(buffer);
 
         StatementDeParser stmtDeparser = new StatementDeParser(expr, selectDeparser, buffer);
 
         Statement stmt = CCJSqlParserUtil.parse(sql);
 
         stmt.accept(stmtDeparser);
-        return stmtDeparser.getBuffer().toString();
+        return stmtDeparser.getBuilder().toString();
     }
 
     @Test
     public void testIssue1608() throws JSQLParserException {
         System.out.println(cleanStatement("SELECT 'abc', 5 FROM mytable WHERE col='test'"));
-        System.out.println(cleanStatement("UPDATE table1 A SET A.columna = 'XXX' WHERE A.cod_table = 'YYY'"));
-        System.out.println(cleanStatement("INSERT INTO example (num, name, address, tel) VALUES (1, 'name', 'test ', '1234-1234')"));
+        System.out.println(
+                cleanStatement("UPDATE table1 A SET A.columna = 'XXX' WHERE A.cod_table = 'YYY'"));
+        System.out.println(cleanStatement(
+                "INSERT INTO example (num, name, address, tel) VALUES (1, 'name', 'test ', '1234-1234')"));
         System.out.println(cleanStatement("DELETE FROM table1 where col=5 and col2=4"));
     }
 }

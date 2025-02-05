@@ -17,44 +17,45 @@ import java.util.List;
 
 public class SetStatementDeParser extends AbstractDeParser<SetStatement> {
 
-    private ExpressionVisitor expressionVisitor;
+    private ExpressionVisitor<StringBuilder> expressionVisitor;
 
-    public SetStatementDeParser(ExpressionVisitor expressionVisitor, StringBuilder buffer) {
+    public SetStatementDeParser(ExpressionVisitor<StringBuilder> expressionVisitor,
+            StringBuilder buffer) {
         super(buffer);
         this.expressionVisitor = expressionVisitor;
     }
 
     @Override
     public void deParse(SetStatement set) {
-        buffer.append("SET ");
+        builder.append("SET ");
         if (set.getEffectParameter() != null) {
-            buffer.append(set.getEffectParameter()).append(" ");
+            builder.append(set.getEffectParameter()).append(" ");
         }
         for (int i = 0; i < set.getCount(); i++) {
             if (i > 0) {
-                buffer.append(", ");
+                builder.append(", ");
             }
-            buffer.append(set.getName(i));
+            builder.append(set.getName(i));
             if (set.isUseEqual(i)) {
-                buffer.append(" =");
+                builder.append(" =");
             }
-            buffer.append(" ");
+            builder.append(" ");
             List<Expression> expressions = set.getExpressions(i);
             for (int j = 0; j < expressions.size(); j++) {
                 if (j > 0) {
-                    buffer.append(", ");
+                    builder.append(", ");
                 }
-                expressions.get(j).accept(expressionVisitor);
+                expressions.get(j).accept(expressionVisitor, null);
             }
         }
 
     }
 
-    public ExpressionVisitor getExpressionVisitor() {
+    public ExpressionVisitor<StringBuilder> getExpressionVisitor() {
         return expressionVisitor;
     }
 
-    public void setExpressionVisitor(ExpressionVisitor visitor) {
+    public void setExpressionVisitor(ExpressionVisitor<StringBuilder> visitor) {
         expressionVisitor = visitor;
     }
 }

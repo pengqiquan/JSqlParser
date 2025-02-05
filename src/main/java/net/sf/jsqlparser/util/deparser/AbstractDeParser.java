@@ -9,24 +9,46 @@
  */
 package net.sf.jsqlparser.util.deparser;
 
+import net.sf.jsqlparser.expression.ExpressionVisitor;
+import net.sf.jsqlparser.statement.update.UpdateSet;
+
+import java.util.List;
+
 /**
  * A base for a Statement DeParser
  *
  * @param <S> the type of statement this DeParser supports
  */
 abstract class AbstractDeParser<S> {
-    protected StringBuilder buffer;
+    protected StringBuilder builder;
 
-    protected AbstractDeParser(StringBuilder buffer) {
-        this.buffer = buffer;
+    protected AbstractDeParser(StringBuilder builder) {
+        this.builder = builder;
     }
 
-    public StringBuilder getBuffer() {
-        return buffer;
+    public static void deparseUpdateSets(List<UpdateSet> updateSets, StringBuilder buffer,
+            ExpressionVisitor<StringBuilder> visitor) {
+        ExpressionListDeParser<?> expressionListDeParser =
+                new ExpressionListDeParser<>(visitor, buffer);
+        int j = 0;
+        if (updateSets != null) {
+            for (UpdateSet updateSet : updateSets) {
+                if (j++ > 0) {
+                    buffer.append(", ");
+                }
+                expressionListDeParser.deParse(updateSet.getColumns());
+                buffer.append(" = ");
+                expressionListDeParser.deParse(updateSet.getValues());
+            }
+        }
     }
 
-    public void setBuffer(StringBuilder buffer) {
-        this.buffer = buffer;
+    public StringBuilder getBuilder() {
+        return builder;
+    }
+
+    public void setBuilder(StringBuilder builder) {
+        this.builder = builder;
     }
 
     /**

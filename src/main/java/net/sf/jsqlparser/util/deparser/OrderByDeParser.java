@@ -17,13 +17,14 @@ import net.sf.jsqlparser.statement.select.OrderByElement;
 
 public class OrderByDeParser extends AbstractDeParser<List<OrderByElement>> {
 
-    private ExpressionVisitor expressionVisitor;
+    private ExpressionVisitor<StringBuilder> expressionVisitor;
 
     OrderByDeParser() {
         super(new StringBuilder());
     }
 
-    public OrderByDeParser(ExpressionVisitor expressionVisitor, StringBuilder buffer) {
+    public OrderByDeParser(ExpressionVisitor<StringBuilder> expressionVisitor,
+            StringBuilder buffer) {
         super(buffer);
         this.expressionVisitor = expressionVisitor;
     }
@@ -35,35 +36,40 @@ public class OrderByDeParser extends AbstractDeParser<List<OrderByElement>> {
 
     public void deParse(boolean oracleSiblings, List<OrderByElement> orderByElementList) {
         if (oracleSiblings) {
-            buffer.append(" ORDER SIBLINGS BY ");
+            builder.append(" ORDER SIBLINGS BY ");
         } else {
-            buffer.append(" ORDER BY ");
+            builder.append(" ORDER BY ");
         }
 
-        for (Iterator<OrderByElement> iter = orderByElementList.iterator(); iter.hasNext();) {
-            OrderByElement orderByElement = iter.next();
+        for (Iterator<OrderByElement> iterator = orderByElementList.iterator(); iterator
+                .hasNext();) {
+            OrderByElement orderByElement = iterator.next();
             deParseElement(orderByElement);
-            if (iter.hasNext()) {
-                buffer.append(", ");
+            if (iterator.hasNext()) {
+                builder.append(", ");
             }
         }
     }
 
     public void deParseElement(OrderByElement orderBy) {
-        orderBy.getExpression().accept(expressionVisitor);
+        orderBy.getExpression().accept(expressionVisitor, null);
         if (!orderBy.isAsc()) {
-            buffer.append(" DESC");
+            builder.append(" DESC");
         } else if (orderBy.isAscDescPresent()) {
-            buffer.append(" ASC");
+            builder.append(" ASC");
         }
         if (orderBy.getNullOrdering() != null) {
-            buffer.append(' ');
-            buffer.append(orderBy.getNullOrdering() == OrderByElement.NullOrdering.NULLS_FIRST ? "NULLS FIRST"
+            builder.append(' ');
+            builder.append(orderBy.getNullOrdering() == OrderByElement.NullOrdering.NULLS_FIRST
+                    ? "NULLS FIRST"
                     : "NULLS LAST");
+        }
+        if (orderBy.isMysqlWithRollup()) {
+            builder.append(" WITH ROLLUP");
         }
     }
 
-    void setExpressionVisitor(ExpressionVisitor expressionVisitor) {
+    void setExpressionVisitor(ExpressionVisitor<StringBuilder> expressionVisitor) {
         this.expressionVisitor = expressionVisitor;
     }
 

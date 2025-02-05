@@ -9,155 +9,139 @@
  */
 package net.sf.jsqlparser.util.deparser;
 
-import java.util.Iterator;
-
 import net.sf.jsqlparser.expression.ExpressionVisitor;
 import net.sf.jsqlparser.expression.ExpressionVisitorAdapter;
 import net.sf.jsqlparser.statement.select.Join;
 import net.sf.jsqlparser.statement.select.OrderByElement;
 import net.sf.jsqlparser.statement.select.OrderByVisitor;
-import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.WithItem;
 import net.sf.jsqlparser.statement.update.Update;
-import net.sf.jsqlparser.statement.update.UpdateSet;
 
-public class UpdateDeParser extends AbstractDeParser<Update> implements OrderByVisitor {
+import java.util.Iterator;
 
-    private ExpressionVisitor expressionVisitor = new ExpressionVisitorAdapter();
+public class UpdateDeParser extends AbstractDeParser<Update>
+        implements OrderByVisitor<StringBuilder> {
+
+    private ExpressionVisitor<StringBuilder> expressionVisitor = new ExpressionVisitorAdapter<>();
 
     public UpdateDeParser() {
         super(new StringBuilder());
     }
 
-    public UpdateDeParser(ExpressionVisitor expressionVisitor, StringBuilder buffer) {
+    public UpdateDeParser(ExpressionVisitor<StringBuilder> expressionVisitor,
+            StringBuilder buffer) {
         super(buffer);
         this.expressionVisitor = expressionVisitor;
     }
 
     @Override
-    @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity", "PMD.ExcessiveMethodLength"})
+    @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.NPathComplexity",
+            "PMD.ExcessiveMethodLength"})
     public void deParse(Update update) {
-         if (update.getWithItemsList() != null && !update.getWithItemsList().isEmpty()) {
-            buffer.append("WITH ");
-            for (Iterator<WithItem> iter = update.getWithItemsList().iterator(); iter.hasNext();) {
-                WithItem withItem = iter.next();
-                buffer.append(withItem);
+        if (update.getWithItemsList() != null && !update.getWithItemsList().isEmpty()) {
+            builder.append("WITH ");
+            for (Iterator<WithItem<?>> iter = update.getWithItemsList().iterator(); iter
+                    .hasNext();) {
+                WithItem<?> withItem = iter.next();
+                builder.append(withItem);
                 if (iter.hasNext()) {
-                    buffer.append(",");
+                    builder.append(",");
                 }
-                buffer.append(" ");
+                builder.append(" ");
             }
         }
-        buffer.append("UPDATE ");
+        builder.append("UPDATE ");
+        if (update.getOracleHint() != null) {
+            builder.append(update.getOracleHint()).append(" ");
+        }
         if (update.getModifierPriority() != null) {
-            buffer.append(update.getModifierPriority()).append(" ");
+            builder.append(update.getModifierPriority()).append(" ");
         }
         if (update.isModifierIgnore()) {
-            buffer.append("IGNORE ");
+            builder.append("IGNORE ");
         }
-        buffer.append(update.getTable());
+        builder.append(update.getTable());
         if (update.getStartJoins() != null) {
             for (Join join : update.getStartJoins()) {
                 if (join.isSimple()) {
-                    buffer.append(", ").append(join);
+                    builder.append(", ").append(join);
                 } else {
-                    buffer.append(" ").append(join);
+                    builder.append(" ").append(join);
                 }
             }
         }
-        buffer.append(" SET ");
+        builder.append(" SET ");
 
-        int j=0;
-        for (UpdateSet updateSet:update.getUpdateSets()) {
-            if (j > 0) {
-                buffer.append(", ");
-            }
+        deparseUpdateSetsClause(update);
 
-            if (updateSet.isUsingBracketsForColumns()) {
-                buffer.append("(");
-            }
-            for (int i = 0; i < updateSet.getColumns().size(); i++) {
-                if (i > 0) {
-                    buffer.append(", ");
-                }
-                updateSet.getColumns().get(i).accept(expressionVisitor);
-            }
-            if (updateSet.isUsingBracketsForColumns()) {
-                buffer.append(")");
-            }
-
-            buffer.append(" = ");
-
-            if (updateSet.isUsingBracketsForValues()) {
-                buffer.append("(");
-            }
-            for (int i = 0; i < updateSet.getExpressions().size(); i++) {
-                if (i > 0) {
-                    buffer.append(", ");
-                }
-                updateSet.getExpressions().get(i).accept(expressionVisitor);
-            }
-            if (updateSet.isUsingBracketsForValues()) {
-                buffer.append(")");
-            }
-
-            j++;
-        }
-
-        if (update.getOutputClause()!=null) {
-            update.getOutputClause().appendTo(buffer);
+        if (update.getOutputClause() != null) {
+            update.getOutputClause().appendTo(builder);
         }
 
         if (update.getFromItem() != null) {
-            buffer.append(" FROM ").append(update.getFromItem());
+            builder.append(" FROM ").append(update.getFromItem());
             if (update.getJoins() != null) {
                 for (Join join : update.getJoins()) {
                     if (join.isSimple()) {
-                        buffer.append(", ").append(join);
+                        builder.append(", ").append(join);
                     } else {
-                        buffer.append(" ").append(join);
+                        builder.append(" ").append(join);
                     }
                 }
             }
         }
 
-        if (update.getWhere() != null) {
-            buffer.append(" WHERE ");
-            update.getWhere().accept(expressionVisitor);
+        deparseWhereClause(update);
+
+        if (update.getPreferringClause() != null) {
+            builder.append(" ").append(update.getPreferringClause());
         }
         if (update.getOrderByElements() != null) {
-            new OrderByDeParser(expressionVisitor, buffer).deParse(update.getOrderByElements());
+            new OrderByDeParser(expressionVisitor, builder).deParse(update.getOrderByElements());
         }
         if (update.getLimit() != null) {
-            new LimitDeparser(buffer).deParse(update.getLimit());
+            new LimitDeparser(expressionVisitor, builder).deParse(update.getLimit());
         }
 
-        if (update.getReturningExpressionList() != null) {
-            buffer.append(" RETURNING ").append(PlainSelect.
-                    getStringList(update.getReturningExpressionList(), true, false));
+        if (update.getReturningClause() != null) {
+            update.getReturningClause().appendTo(builder);
         }
     }
 
-    public ExpressionVisitor getExpressionVisitor() {
+    protected void deparseWhereClause(Update update) {
+        if (update.getWhere() != null) {
+            builder.append(" WHERE ");
+            update.getWhere().accept(expressionVisitor, null);
+        }
+    }
+
+    protected void deparseUpdateSetsClause(Update update) {
+        deparseUpdateSets(update.getUpdateSets(), builder, expressionVisitor);
+    }
+
+
+    public ExpressionVisitor<StringBuilder> getExpressionVisitor() {
         return expressionVisitor;
     }
 
-    public void setExpressionVisitor(ExpressionVisitor visitor) {
+    public void setExpressionVisitor(ExpressionVisitor<StringBuilder> visitor) {
         expressionVisitor = visitor;
     }
 
     @Override
-    public void visit(OrderByElement orderBy) {
-        orderBy.getExpression().accept(expressionVisitor);
+    public <S> StringBuilder visit(OrderByElement orderBy, S context) {
+        orderBy.getExpression().accept(expressionVisitor, context);
         if (!orderBy.isAsc()) {
-            buffer.append(" DESC");
+            builder.append(" DESC");
         } else if (orderBy.isAscDescPresent()) {
-            buffer.append(" ASC");
+            builder.append(" ASC");
         }
         if (orderBy.getNullOrdering() != null) {
-            buffer.append(' ');
-            buffer.append(orderBy.getNullOrdering() == OrderByElement.NullOrdering.NULLS_FIRST ? "NULLS FIRST"
+            builder.append(' ');
+            builder.append(orderBy.getNullOrdering() == OrderByElement.NullOrdering.NULLS_FIRST
+                    ? "NULLS FIRST"
                     : "NULLS LAST");
         }
+        return builder;
     }
 }
